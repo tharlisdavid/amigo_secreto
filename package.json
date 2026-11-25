@@ -1,0 +1,9 @@
+{
+  "name": "sorteio-natal",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Amigo secreto de Natal",
+  "scripts": { "start": "node server.js", "test": "node --test" },
+  "engines": { "node": ">=20" }
+}

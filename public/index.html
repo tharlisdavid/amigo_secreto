@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101b3d">
+  <meta name="robots" content="noindex">
+  <title>Amigo Secreto de Natal</title>
+  <link rel="icon" href="/icone.svg" type="image/svg+xml">
+  <link rel="preload" href="/fonts/berkshire.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/estilo.css">
+</head>
+<body>
+  <div class="cenario" aria-hidden="true">
+    <svg class="colinas" viewBox="0 0 1600 420" preserveAspectRatio="xMidYMax slice">
+      <g fill="#33446f">
+        <path d="M0 250 60 170l28 34 42-82 38 70 30-40 52 92 44-60 40 72 70-110 46 84 34-44 60 96 52-70 44 64 70-120 58 104 40-56 62 86 50-74 54 80 64-104 48 86 42-60 60 92 48-70 50 66 70-108 44 82 48-62V420H0Z"/>
+      </g>
+      <path fill="#8fa3cc" d="M0 300c180-70 360-60 560-10s420 40 620-20 320-40 420-10v160H0Z"/>
+      <g class="vila">
+        <g fill="#3b2b3f">
+          <path d="M1085 298v-58l38-30 38 30v58Z"/><path d="M1172 298v-58l30-24 30 24v58Z"/><path d="M330 300v-56l34-28 34 28v56Z"/>
+        </g>
+        <g fill="#f4f7fd">
+          <path d="m1078 246 45-38 45 38-6 5-39-31-39 31Z"/><path d="m1166 244 36-31 36 31-5 5-31-25-31 25Z"/><path d="m323 248 41-35 41 35-6 5-35-28-35 28Z"/>
+        </g>
+        <g fill="#8fa3cc"><ellipse cx="1160" cy="304" rx="112" ry="15"/><ellipse cx="364" cy="305" rx="66" ry="14"/></g>
+        <g class="janelas" fill="#ffd27a">
+          <path d="M1100 252h14v16h-14zM1132 252h14v16h-14zM1195 250h14v14h-14zM346 256h13v15h-13zM370 256h13v15h-13z"/>
+        </g>
+      </g>
+      <path fill="#c9d6ee" d="M0 350c220-70 420-40 640-8s380 20 560-30 290-40 400-10v118H0Z"/>
+      <path fill="#eef3fc" d="M0 392c260-50 520-40 800-12s540 6 800-30v70H0Z"/>
+    </svg>
+    <canvas id="neve"></canvas>
+  </div>
+  <div id="varal" class="varal" aria-hidden="true"></div>
+  <main id="app" tabindex="-1"></main>
+  <footer class="rodape">Desenvolvido por Tharlis David</footer>
+  <div id="avisos" class="avisos" role="status" aria-live="polite"></div>
+  <noscript>Este site precisa de JavaScript ligado.</noscript>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
