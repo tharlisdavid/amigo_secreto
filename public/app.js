@@ -84,6 +84,38 @@ function mostrar(...els) {
   scrollTo(0, 0);
 }
 
+/* ---------- Modo de usar: abre sozinho na primeira visita e fica num botão ---------- */
+
+const USO = {
+  organizador: ['Como organizar', [
+    ['Preencha a cartinha.', 'Dê um nome ao amigo secreto e, se quiser, o dia, o valor e o lugar.'],
+    ['Coloque os nomes.', 'Escreva um por linha ou importe um arquivo TXT, CSV ou XLSX.'],
+    ['Guarde a sua página.', 'Depois de criar, você cai na página do organizador. Salve esse endereço e não mande para a turma.'],
+    ['Faça o sorteio.', 'Antes, se precisar, marque quem não pode se tirar, como casais.'],
+    ['Mande o link da turma.', 'É um link só, para o grupo do WhatsApp. Cada um abre o próprio presente.'],
+  ], 'Nem a sua página mostra quem tirou quem.'],
+  participante: ['Como usar', [
+    ['Toque no seu nome.', 'Cada bolinha da árvore é uma pessoa.'],
+    ['Crie um PIN de 4 números.', 'Guarde bem: só com ele dá para ver quem você tirou.'],
+    ['Abra a caixa.', 'Quando o sorteio estiver feito, toque no presente e veja o nome. Confira se ninguém está espiando!'],
+    ['Deixe a sua lista de desejos.', 'Só quem tirou você vai ler.'],
+    ['Volte quando quiser.', 'Entre com o mesmo PIN para rever o nome e a lista da pessoa.'],
+  ], 'Esqueceu o PIN? Peça para quem organizou apagar.'],
+};
+function comoUsar(tipo) {
+  const [titulo, passos, nota] = USO[tipo];
+  const d = h('dialog', { 'aria-label': titulo, onclose: () => { d.remove(); try { localStorage.setItem(`viu-${tipo}`, '1'); } catch { /* navegação privada */ } } },
+    carta(h('h2', {}, titulo), h('ol', { className: 'passos' }, passos.map(([a, b]) => h('li', {}, h('b', {}, a), ` ${b}`))), h('p', { className: 'dica' }, nota),
+      h('button', { className: 'botao cheio', onclick: () => d.close() }, 'Entendi')));
+  document.body.append(d);
+  d.showModal();
+}
+function primeiraVisita(tipo) {
+  try { if (localStorage.getItem(`viu-${tipo}`)) return; } catch { /* mostra */ }
+  comoUsar(tipo);
+}
+const botaoUso = (tipo) => h('p', { className: 'ver-uso' }, h('button', { className: 'botao claro', onclick: () => comoUsar(tipo) }, 'Como usar'));
+
 function detalhes(g) {
   const itens = [];
   if (g.data) {
@@ -146,10 +178,12 @@ function telaInicio() {
   mostrar(h('div', { className: 'inicio' },
     h('header', { className: 'chamada' }, h('h1', {}, 'Amigo Secreto'),
       h('p', {}, 'Escreva os nomes, faça o sorteio e mande o link. Cada um abre o seu presente e descobre quem tirou.'),
+      botaoUso('organizador'),
       enfeiteGrande(),
       meus.length > 0 && h('nav', { className: 'meus' }, h('p', {}, 'Sorteios que você organiza'),
         meus.map((s) => h('a', { href: `/organizar/${s.id}#${s.chave}` }, s.nome)))),
     form));
+  primeiraVisita('organizador');
 }
 
 /* ---------- Organizador ---------- */
@@ -286,7 +320,7 @@ async function telaArvore(id) {
     mostrar(h('div', { className: 'festa' }, h('h1', {}, g.nome), detalhes(g),
       h('p', { className: 'convite' }, !g.sorteado ? 'O sorteio ainda não foi feito. Toque no seu nome e já deixe sua lista de desejos.'
         : abertos === total ? 'Todos já sabem quem tiraram. A árvore está toda acesa!' : 'Toque no seu nome para abrir o seu presente. Sua bolinha acende na árvore.'),
-      arvore, g.sorteado && h('p', { className: 'placar' }, `${abertos} de ${total} bolinhas acesas`)));
+      botaoUso('participante'), arvore, g.sorteado && h('p', { className: 'placar' }, `${abertos} de ${total} bolinhas acesas`)));
     scrollTo(0, y);
   }
 
@@ -368,6 +402,7 @@ async function telaArvore(id) {
   }
 
   desenhar();
+  primeiraVisita('participante');
   setInterval(atualizar, 12_000);
   addEventListener('resize', () => {
     if (naArvore && !document.querySelector('dialog') && Math.min(app.clientWidth - 32, 660) !== larguraAntes) desenhar();

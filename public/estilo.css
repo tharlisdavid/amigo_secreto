@@ -216,3 +216,6 @@ dialog .carta { box-shadow: none; }
 dialog:has(.globo)::backdrop { background: rgb(8 14 36 / .93); }
 .importar { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
 .campo textarea.soltar { border: 2px dashed var(--pinho); background: #eef7f1; }
+.passos { margin: 0; padding-left: 1.4em; display: grid; gap: 10px; }
+.passos li::marker { font-weight: 800; color: var(--cereja); }
+.ver-uso { margin-top: 16px !important; }
