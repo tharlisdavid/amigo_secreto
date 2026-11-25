@@ -87,20 +87,20 @@ function mostrar(...els) {
 /* ---------- Modo de usar: abre sozinho na primeira visita e fica num botão ---------- */
 
 const USO = {
-  organizador: ['Como organizar', [
-    ['Preencha a cartinha.', 'Dê um nome ao amigo secreto e, se quiser, o dia, o valor e o lugar.'],
-    ['Coloque os nomes.', 'Escreva um por linha ou importe um arquivo TXT, CSV ou XLSX.'],
-    ['Guarde a sua página.', 'Depois de criar, você cai na página do organizador. Salve esse endereço e não mande para a turma.'],
-    ['Faça o sorteio.', 'Antes, se precisar, marque quem não pode se tirar, como casais.'],
-    ['Chame a turma.', 'Mostre o telão com o QR code e o PIN, ou mande o link no WhatsApp. Cada um entra do próprio aparelho.'],
+  organizador: ['Como fazer o sorteio', [
+    ['Escreva os nomes.', 'Um embaixo do outro. Ou toque em “Importar lista” e escolha um arquivo TXT, CSV ou XLSX.'],
+    ['Toque em “Criar amigo secreto”.', 'Abre a sua página, que é só sua. Guarde o endereço e não mande para ninguém.'],
+    ['Chame a turma.', 'Mande o link no WhatsApp ou mostre o telão com o QR code e o PIN.'],
+    ['Espere todos entrarem.', 'Cada bolinha ganha cor quando a pessoa chega.'],
+    ['Toque em “Sortear os nomes”.', 'A caixa de presente aparece no celular de cada um.'],
   ], 'Nem a sua página mostra quem tirou quem.'],
-  participante: ['Como usar', [
-    ['Toque no seu nome.', 'Use o seu celular (iPhone ou Android) ou computador, de onde estiver. Cada bolinha é uma pessoa.'],
-    ['Crie uma senha de 4 números.', 'Guarde bem: só com ela dá para ver quem você tirou.'],
-    ['Abra a caixa.', 'Ela aparece assim que o sorteio for feito. Toque no presente e veja o nome. Confira se ninguém está espiando!'],
-    ['Deixe a sua lista de desejos.', 'Só quem tirou você vai ler.'],
-    ['Volte quando quiser.', 'Entre com a mesma senha, até de outro aparelho, para rever o nome e a lista da pessoa.'],
-  ], 'Vai pegar por uma criança? Toque no nome dela e crie outra senha. Esqueceu a senha? Peça para quem organizou apagar.'],
+  participante: ['Como brincar', [
+    ['Ache o seu nome na árvore.', 'Cada bolinha é uma pessoa. Toque só na sua!'],
+    ['Invente uma senha de 4 números.', 'Não conte para ninguém e não esqueça.'],
+    ['Espere um pouquinho.', 'Quando sortearem, aparece uma caixa de presente.'],
+    ['Toque na caixa.', 'Ela abre e mostra o nome de quem você vai presentear. É segredo!'],
+    ['Escreva o que quer ganhar.', 'Só quem tirou você vai ler.'],
+  ], 'Vai pegar por uma criança? Toque no nome dela e invente outra senha. Esqueceu a senha? Peça para quem organizou apagar.'],
 };
 function comoUsar(tipo) {
   const [titulo, passos, nota] = USO[tipo];
@@ -161,6 +161,9 @@ function arvoreDe(g, largura, aoTocar, novos = new Set()) {
   g.participantes.forEach((p, i) => {
     const b = h(aoTocar ? 'button' : 'div', { className: `bolinha ${p.abriu ? 'acesa' : p.temPin ? 'entrou' : ''} ${novos.has(p.id) ? 'chegou' : ''}`, title: p.nome, onclick: aoTocar && (() => aoTocar(p)) },
       bolinha(i), h('span', {}, p.nome), p.abriu && h('em', { className: 'so-leitor' }, ' (já abriu o presente)'));
+    // Nome comprido diminui em vez de quebrar no meio da palavra.
+    const maior = Math.max(...p.nome.split(' ').map((x) => x.length));
+    b.querySelector('span').style.fontSize = `${Math.max(10, Math.min(15.5, (a.larguraItem - 20) / (maior * .58)))}px`;
     Object.assign(b.style, { left: `${a.pos[i].x}px`, top: `${a.pos[i].y}px`, width: `${a.larguraItem}px` });
     arvore.append(b);
   });
