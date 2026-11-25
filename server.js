@@ -2,7 +2,7 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { promises as fs, mkdirSync, readdirSync, readFileSync } from 'node:fs';
-import { createHash, randomBytes, scrypt, timingSafeEqual } from 'node:crypto';
+import { createHash, randomBytes, randomInt, scrypt, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { sortear } from './sorteio.js';
@@ -26,6 +26,14 @@ for (const arq of readdirSync(DADOS).filter((f) => f.endsWith('.json'))) {
   grupos.set(g.id, g);
 }
 
+// PIN do sorteio: 6 números, é o que a turma digita para entrar.
+const porCodigo = new Map();
+function darCodigo(g) {
+  while (!g.codigo || porCodigo.has(g.codigo)) g.codigo = String(randomInt(100000, 1000000));
+  porCodigo.set(g.codigo, g.id);
+}
+for (const g of grupos.values()) if (g.codigo) porCodigo.set(g.codigo, g.id);
+
 const filas = new Map();
 function salvar(g) {
   const gravar = async () => {
@@ -37,6 +45,8 @@ function salvar(g) {
   filas.set(g.id, p);
   return p;
 }
+
+for (const g of grupos.values()) if (!g.codigo) { darCodigo(g); salvar(g); }
 
 /* ---------- Utilidades ---------- */
 
@@ -82,7 +92,8 @@ function exigirAntesDoSorteio(g) {
 /* ---------- O que cada um pode ver (nunca inclui quem tirou quem) ---------- */
 
 const visaoPublica = (g) => ({
-  id: g.id, nome: g.nome, data: g.data, valor: g.valor, local: g.local,
+  id: g.id, codigo: g.codigo, nome: g.nome, data: g.data, valor: g.valor, local: g.local,
+  site: process.env.ENDERECO || null,
   sorteado: Boolean(g.sorteadoEm),
   participantes: g.participantes.map((p) => ({
     id: p.id, nome: p.nome, abriu: Boolean(p.abriuEm), temPin: Boolean(p.pin),
@@ -129,19 +140,19 @@ async function hashPin(pin, sal) {
 async function autenticar(g, { pid, pin, criar }) {
   const p = g.participantes.find((x) => x.id === pid);
   if (!p) throw new Erro(404, 'Não encontramos esse nome na lista.');
-  if (!/^\d{4}$/.test(pin ?? '')) throw new Erro(400, 'O PIN tem 4 números.');
+  if (!/^\d{4}$/.test(pin ?? '')) throw new Erro(400, 'A senha tem 4 números.');
 
   if (!p.pin) {
-    if (!criar) throw new Erro(409, 'Esse nome está sem PIN. Volte à árvore e crie um.');
+    if (!criar) throw new Erro(409, 'Esse nome está sem senha. Volte à árvore e crie uma.');
     const sal = novoId(12);
     const hash = await hashPin(pin, sal);
-    if (p.pin) throw new Erro(409, 'Alguém acabou de criar um PIN para esse nome.');
+    if (p.pin) throw new Erro(409, 'Alguém acabou de criar a senha desse nome.');
     p.pin = { sal, hash };
     await salvar(g);
     return p;
   }
   // Nunca deixa um pedido de "criar" passar por cima de um PIN existente.
-  if (criar) throw new Erro(409, 'Esse nome já tem PIN. Toque nele de novo para entrar.');
+  if (criar) throw new Erro(409, 'Esse nome já tem senha. Toque nele de novo para entrar.');
 
   const k = `${g.id}|${pid}`;
   let t = tentativas.get(k);
@@ -154,7 +165,7 @@ async function autenticar(g, { pid, pin, criar }) {
   if (++t.erros >= MAX_ERROS) t.ate = Date.now() + CASTIGO;
   const { sal, hash } = p.pin;
   const ok = timingSafeEqual(Buffer.from(await hashPin(pin, sal), 'hex'), Buffer.from(hash, 'hex'));
-  if (!ok) throw new Erro(401, 'PIN errado. Confira os 4 números.');
+  if (!ok) throw new Erro(401, 'Senha errada. Confira os 4 números.');
   tentativas.delete(k);
   return p;
 }
@@ -193,9 +204,20 @@ rota('POST', '/grupos', async ({ corpo }) => {
     id: novoId(), chaveHash: sha(chave), ...festa,
     criadoEm: new Date().toISOString(), sorteadoEm: null, restricoes: [], participantes,
   };
+  darCodigo(g);
   await salvar(g);
   grupos.set(g.id, g);
   return { id: g.id, chave };
+});
+
+// Com 6 números daria para chutar; depois de 40 erros por minuto, todos esperam (o link e o QR seguem valendo).
+let errosCodigo = { n: 0, ate: 0 };
+rota('GET', '/codigo/:codigo', ({ par }) => {
+  if (errosCodigo.ate < Date.now()) errosCodigo = { n: 0, ate: Date.now() + 60_000 };
+  if (errosCodigo.n >= 40) throw new Erro(429, 'Muitas tentativas. Espere um minuto ou use o QR code.');
+  const id = porCodigo.get(par.codigo);
+  if (!id) { errosCodigo.n++; throw new Erro(404, 'Não achamos sorteio com esse PIN. Confira os 6 números.'); }
+  return { id };
 });
 
 rota('GET', '/grupos/:id', ({ g }) => visaoPublica(g));
@@ -314,7 +336,7 @@ async function estatico(caminho, res) {
     res.writeHead(200, { 'content-type': TIPOS['.js'], 'cache-control': 'no-cache' });
     return res.end(lista);
   }
-  const pagina = caminho === '/' || /^\/(g|organizar)\/[\w-]+\/?$/.test(caminho);
+  const pagina = caminho === '/' || /^\/(novo|(g|organizar|telao)\/[\w-]+)\/?$/.test(caminho);
   const arq = path.join(PUBLICO, pagina ? 'index.html' : path.normalize(decodeURIComponent(caminho)));
   const tipo = TIPOS[path.extname(arq)];
   if (!arq.startsWith(PUBLICO + path.sep) || !tipo) throw new Erro(404, 'Página não encontrada.');

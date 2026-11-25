@@ -6,13 +6,6 @@
   "outputDirectory": "dist",
   "cleanUrls": true,
   "trailingSlash": false,
-  "redirects": [
-    {
-      "source": "/",
-      "destination": "/demo",
-      "permanent": false
-    }
-  ],
   "headers": [
     {
       "source": "/(.*)",
@@ -35,6 +28,37 @@
           "value": "default-src 'none'; img-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; frame-ancestors 'none'; base-uri 'none'"
         }
       ]
+    },
+    {
+      "source": "/((?!demo).*)",
+      "headers": [
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; frame-ancestors 'none'; base-uri 'none'"
+        }
+      ]
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://sectors-rational-pee-urls.trycloudflare.com/api/:path*"
+    },
+    {
+      "source": "/novo",
+      "destination": "/"
+    },
+    {
+      "source": "/g/:id",
+      "destination": "/"
+    },
+    {
+      "source": "/telao/:id",
+      "destination": "/"
+    },
+    {
+      "source": "/organizar/:id",
+      "destination": "/"
     }
   ]
 }

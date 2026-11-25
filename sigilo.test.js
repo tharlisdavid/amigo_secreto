@@ -99,3 +99,14 @@ test('adivinhar o PIN trava depois de 5 erros', async () => {
   assert.equal(st.at(-1), 429);
   assert.equal((await api('POST', `/${id}/abrir`, { pid: alvo.id, pin: pin(N - 1) })).status, 429, 'nem o certo passa durante o bloqueio');
 });
+
+test('o PIN do sorteio leva ao sorteio certo e trava quem fica chutando', async () => {
+  const { codigo } = (await api('GET', `/${id}`)).json;
+  assert.match(codigo, /^\d{6}$/);
+  const buscar = async (c) => { const r = await fetch(`${url}/api/codigo/${c}`); return { status: r.status, json: await r.json() }; };
+  assert.deepEqual((await buscar(codigo)).json, { id });
+  const errado = codigo === '111111' ? '222222' : '111111', st = [];
+  for (let i = 0; i < 45; i++) st.push((await buscar(errado)).status);
+  assert.equal(st[0], 404);
+  assert.equal(st.at(-1), 429);
+});

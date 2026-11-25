@@ -92,15 +92,15 @@ const USO = {
     ['Coloque os nomes.', 'Escreva um por linha ou importe um arquivo TXT, CSV ou XLSX.'],
     ['Guarde a sua página.', 'Depois de criar, você cai na página do organizador. Salve esse endereço e não mande para a turma.'],
     ['Faça o sorteio.', 'Antes, se precisar, marque quem não pode se tirar, como casais.'],
-    ['Mande o link da turma.', 'É um link só, para o grupo do WhatsApp. Cada um abre o próprio presente.'],
+    ['Chame a turma.', 'Mostre o telão com o QR code e o PIN, ou mande o link no WhatsApp. Cada um entra do próprio aparelho.'],
   ], 'Nem a sua página mostra quem tirou quem.'],
   participante: ['Como usar', [
-    ['Toque no seu nome.', 'Cada bolinha da árvore é uma pessoa.'],
-    ['Crie um PIN de 4 números.', 'Guarde bem: só com ele dá para ver quem você tirou.'],
-    ['Abra a caixa.', 'Quando o sorteio estiver feito, toque no presente e veja o nome. Confira se ninguém está espiando!'],
+    ['Toque no seu nome.', 'Use o seu celular (iPhone ou Android) ou computador, de onde estiver. Cada bolinha é uma pessoa.'],
+    ['Crie uma senha de 4 números.', 'Guarde bem: só com ela dá para ver quem você tirou.'],
+    ['Abra a caixa.', 'Ela aparece assim que o sorteio for feito. Toque no presente e veja o nome. Confira se ninguém está espiando!'],
     ['Deixe a sua lista de desejos.', 'Só quem tirou você vai ler.'],
-    ['Volte quando quiser.', 'Entre com o mesmo PIN para rever o nome e a lista da pessoa.'],
-  ], 'Esqueceu o PIN? Peça para quem organizou apagar.'],
+    ['Volte quando quiser.', 'Entre com a mesma senha, até de outro aparelho, para rever o nome e a lista da pessoa.'],
+  ], 'Vai pegar por uma criança? Toque no nome dela e crie outra senha. Esqueceu a senha? Peça para quem organizou apagar.'],
 };
 function comoUsar(tipo) {
   const [titulo, passos, nota] = USO[tipo];
@@ -115,6 +115,57 @@ function primeiraVisita(tipo) {
   comoUsar(tipo);
 }
 const botaoUso = (tipo) => h('p', { className: 'ver-uso' }, h('button', { className: 'botao claro', onclick: () => comoUsar(tipo) }, 'Como usar'));
+
+/* ---------- PIN do sorteio, QR code e link da turma ---------- */
+
+const NA_MAQUINA = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
+const siteDaTurma = (g) => (NA_MAQUINA && (g.site || g.enderecoRede)) || location.origin;
+const linkDaTurma = (g) => `${siteDaTurma(g)}/g/${g.id}`;
+const pinBonito = (c) => `${c.slice(0, 3)} ${c.slice(3)}`;
+
+function qr(texto) {
+  const q = qrcode(0, 'M');
+  q.addData(texto);
+  q.make();
+  const n = q.getModuleCount(), ns = 'http://www.w3.org/2000/svg';
+  let d = '';
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) if (q.isDark(y, x)) d += `M${x + 4} ${y + 4}h1v1h-1z`;
+  const s = document.createElementNS(ns, 'svg'), p = document.createElementNS(ns, 'path');
+  for (const [k, v] of [['viewBox', `0 0 ${n + 8} ${n + 8}`], ['class', 'qr'], ['role', 'img'], ['aria-label', 'QR code para entrar no sorteio'], ['shape-rendering', 'crispEdges']]) s.setAttribute(k, v);
+  p.setAttribute('d', d);
+  s.append(p);
+  return s;
+}
+
+/** Mostra o globo de neve enquanto o servidor sorteia. Devolve o resultado, ou undefined se falhou. */
+async function globoDeNeve(g, botao, pedir) {
+  const d = h('dialog', { oncancel: (e) => e.preventDefault() }, h('div', { className: 'globo' },
+    h('div', { className: 'bola' }, [...g.participantes].sort(() => Math.random() - .5).slice(0, 6).map((p, i) => {
+      const el = h('i', {}, p.nome.split(' ')[0].slice(0, 12));
+      el.style.animationDelay = `${-i * .19}s`;
+      return el;
+    })), h('h2', {}, 'Misturando os nomes…')));
+  document.body.append(d); d.showModal();
+  const pausa = new Promise((r) => setTimeout(r, 2400));
+  return tentar(botao, async () => {
+    try { const novo = await pedir(); await pausa; return novo; } finally { d.close(); d.remove(); }
+  });
+}
+
+/** Árvore com uma bolinha por pessoa: apagada, entrou (cor viva) ou acesa (abriu o presente). */
+function arvoreDe(g, largura, aoTocar, novos = new Set()) {
+  const total = g.participantes.length;
+  const a = montarArvore(total, largura, g.participantes.every((p) => p.abriu));
+  const arvore = h('div', { className: 'arvore', role: 'group', 'aria-label': 'Participantes' }, a.desenho);
+  arvore.style.width = `${largura}px`; arvore.style.height = `${a.altura}px`;
+  g.participantes.forEach((p, i) => {
+    const b = h(aoTocar ? 'button' : 'div', { className: `bolinha ${p.abriu ? 'acesa' : p.temPin ? 'entrou' : ''} ${novos.has(p.id) ? 'chegou' : ''}`, title: p.nome, onclick: aoTocar && (() => aoTocar(p)) },
+      bolinha(i), h('span', {}, p.nome), p.abriu && h('em', { className: 'so-leitor' }, ' (já abriu o presente)'));
+    Object.assign(b.style, { left: `${a.pos[i].x}px`, top: `${a.pos[i].y}px`, width: `${a.larguraItem}px` });
+    arvore.append(b);
+  });
+  return { arvore, altura: a.altura };
+}
 
 function detalhes(g) {
   const itens = [];
@@ -143,9 +194,83 @@ function camposFesta(v = {}) {
   };
 }
 
-/* ---------- Início: criar sorteio ---------- */
+/* ---------- Início: entrar com o PIN ---------- */
 
-function telaInicio() {
+function telaEntrar() {
+  document.title = 'Amigo Secreto de Natal';
+  const erro = h('p', { className: 'erro', role: 'alert' });
+  const codigo = h('input', { id: 'codigo', inputMode: 'numeric', maxLength: 7, required: true, autocomplete: 'off', placeholder: '000 000', 'aria-label': 'PIN do sorteio, 6 números',
+    oninput() {
+      const n = codigo.value.replace(/\D/g, '').slice(0, 6);
+      codigo.value = n.length > 3 ? pinBonito(n) : n;
+      erro.textContent = '';
+      if (n.length === 6) form.requestSubmit();
+    } });
+  const botao = h('button', { className: 'botao grande cheio' }, 'Entrar');
+  const form = h('form', { async onsubmit(e) {
+    e.preventDefault();
+    const n = codigo.value.replace(/\D/g, '');
+    if (n.length !== 6 || botao.disabled) { if (n.length !== 6) erro.textContent = 'O PIN tem 6 números.'; return; }
+    botao.disabled = true;
+    try { location.href = `/g/${(await api('GET', `/codigo/${n}`)).id}`; } catch (x) { erro.textContent = x.message; codigo.select(); } finally { botao.disabled = false; }
+  } }, carta(h('h2', {}, 'PIN do sorteio'), h('div', { className: 'pin codigo' }, codigo), erro, botao,
+    h('p', { className: 'dica' }, 'Tem um QR code na tela ou no grupo? Aponte a câmera do celular e entre direto.')));
+  const meus = guardados.ler();
+  mostrar(h('div', { className: 'entrada' },
+    h('header', { className: 'chamada' }, h('h1', {}, 'Amigo Secreto')), form,
+    h('div', { className: 'acoes' }, h('a', { className: 'botao verde', href: '/novo' }, 'Criar um sorteio'), h('button', { className: 'botao claro', onclick: () => comoUsar('participante') }, 'Como usar')),
+    meus.length > 0 && h('nav', { className: 'meus' }, h('p', {}, 'Sorteios que você organiza'), meus.map((s) => h('a', { href: `/organizar/${s.id}#${s.chave}` }, s.nome)))));
+}
+
+/* ---------- Telão: QR code, PIN e a turma chegando ao vivo ---------- */
+
+async function telaTelao(id) {
+  const base = `/grupos/${id}`;
+  let g = await api('GET', base), festejou = g.participantes.every((p) => p.abriu);
+  const chave = guardados.ler().find((s) => s.id === id)?.chave;
+  document.body.classList.add('modo-telao');
+  function desenhar(novos) {
+    document.title = `${g.nome} | telão`;
+    const total = g.participantes.length, entraram = g.participantes.filter((p) => p.temPin).length, abriram = g.participantes.filter((p) => p.abriu).length;
+    const largo = innerWidth >= 900, largura = Math.min(largo ? app.clientWidth - 460 : app.clientWidth - 32, 660);
+    const { arvore, altura } = arvoreDe(g, largura, null, novos);
+    // Cabe inteira na tela: num telão ninguém rola a página.
+    const escala = largo ? Math.min(1, Math.max(.55, (innerHeight - 110) / altura)) : 1;
+    arvore.style.transform = `scale(${escala})`; arvore.style.transformOrigin = '50% 0'; arvore.style.marginBottom = `${-altura * (1 - escala)}px`;
+    const botao = h('button', { className: 'botao grande', async onclick() {
+      const novo = await globoDeNeve(g, botao, () => api('POST', `${base}/sortear`, {}, chave));
+      if (novo) { g = novo; desenhar(); estourar(innerWidth / 2, innerHeight * .6); tocarSinos(); }
+    } }, 'Sortear os nomes');
+    const situacao = !g.sorteado ? (entraram === total ? 'Todos chegaram!' : `${entraram} de ${total} já entraram`)
+      : abriram === total ? 'Feliz Natal! Todos já sabem quem tiraram.' : `Abram os presentes! ${abriram} de ${total} já abriram`;
+    const y = scrollY;
+    mostrar(h('div', { className: 'telao' },
+      h('section', { className: 'telao-lado' }, h('h1', {}, g.nome),
+        h('div', { className: 'cartao-qr' }, qr(linkDaTurma(g)), h('p', {}, 'Aponte a câmera ou entre em'), h('b', { className: 'site' }, new URL(siteDaTurma(g)).host), h('p', {}, 'e digite o PIN'), h('strong', {}, pinBonito(g.codigo))),
+        h('p', { className: 'placar', role: 'status' }, situacao),
+        chave && !g.sorteado && botao,
+        chave && h('a', { className: 'botao claro', href: `/organizar/${id}#${chave}` }, 'Página do organizador')),
+      h('section', {}, arvore)));
+    scrollTo(0, y);
+    if (abriram === total && !festejou) { festejou = true; estourar(innerWidth * .65, innerHeight * .4); tocarSinos(); }
+  }
+  desenhar();
+  setInterval(async () => {
+    if (document.hidden || document.querySelector('dialog')) return;
+    const novo = await api('GET', base).catch(() => null);
+    if (!novo || document.querySelector('dialog') || JSON.stringify(novo) === JSON.stringify(g)) return;
+    const antes = new Map(g.participantes.map((p) => [p.id, p]));
+    const novos = new Set(novo.participantes.filter((p) => { const a = antes.get(p.id); return a && ((p.temPin && !a.temPin) || (p.abriu && !a.abriu)); }).map((p) => p.id));
+    g = novo;
+    desenhar(novos);
+  }, 3000);
+  let espera;
+  addEventListener('resize', () => { clearTimeout(espera); espera = setTimeout(() => !document.querySelector('dialog') && desenhar(), 150); });
+}
+
+/* ---------- Criar sorteio ---------- */
+
+function telaNovo() {
   document.title = 'Amigo Secreto de Natal';
   const festa = camposFesta();
   const etiquetas = h('div', { className: 'etiquetas' });
@@ -177,8 +302,8 @@ function telaInicio() {
   const meus = guardados.ler();
   mostrar(h('div', { className: 'inicio' },
     h('header', { className: 'chamada' }, h('h1', {}, 'Amigo Secreto'),
-      h('p', {}, 'Escreva os nomes, faça o sorteio e mande o link. Cada um abre o seu presente e descobre quem tirou.'),
-      botaoUso('organizador'),
+      h('p', {}, 'Escreva os nomes e chame a turma com QR code ou PIN. Cada um abre o seu presente no próprio celular ou computador.'),
+      h('div', { className: 'ver-uso acoes centro' }, h('button', { className: 'botao claro', onclick: () => comoUsar('organizador') }, 'Como usar'), h('a', { className: 'botao claro', href: '/' }, 'Tenho um PIN')),
       enfeiteGrande(),
       meus.length > 0 && h('nav', { className: 'meus' }, h('p', {}, 'Sorteios que você organiza'),
         meus.map((s) => h('a', { href: `/organizar/${s.id}#${s.chave}` }, s.nome)))),
@@ -201,29 +326,16 @@ async function telaOrganizar(id) {
   });
 
   async function sortearAgora(botao) {
-    const d = h('dialog', { oncancel: (e) => e.preventDefault() }, h('div', { className: 'globo' },
-      h('div', { className: 'bola' }, [...g.participantes].sort(() => Math.random() - .5).slice(0, 6).map((p, i) => {
-        const el = h('i', {}, p.nome.split(' ')[0].slice(0, 12));
-        el.style.animationDelay = `${-i * .19}s`;
-        return el;
-      })), h('h2', {}, 'Misturando os nomes…')));
-    document.body.append(d); d.showModal();
-    const pausa = new Promise((r) => setTimeout(r, 2400));
-    await tentar(botao, async () => {
-      try {
-        const novo = await api('POST', `${base}/sortear`, {}, chave);
-        await pausa;
-        g = novo; desenhar(); aviso('Sorteio feito! Agora é só mandar o link.');
-        estourar(innerWidth / 2, innerHeight * .6);
-      } finally { d.close(); d.remove(); }
-    });
+    const novo = await globoDeNeve(g, botao, () => api('POST', `${base}/sortear`, {}, chave));
+    if (!novo) return;
+    g = novo; desenhar(); aviso('Sorteio feito! As caixas já apareceram para a turma.');
+    estourar(innerWidth / 2, innerHeight * .6);
   }
 
   function desenhar() {
     document.title = `${g.nome} | organizar`;
-    const local = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
-    const link = `${local && g.enderecoRede ? g.enderecoRede : location.origin}/g/${id}`;
-    const convite = `🎄 ${g.nome}: entre no link, toque no seu nome e descubra quem você tirou! ${link}`;
+    const link = linkDaTurma(g);
+    const convite = `🎄 ${g.nome}: entre no link, toque no seu nome e descubra quem você tirou! ${link} (ou digite o PIN ${pinBonito(g.codigo)} em ${siteDaTurma(g)})`;
     const nome = (pid) => g.participantes.find((p) => p.id === pid)?.nome ?? '';
     const abertos = g.participantes.filter((p) => p.abriu).length;
 
@@ -236,11 +348,13 @@ async function telaOrganizar(id) {
       : carta(h('h2', {}, 'Tudo pronto?'), h('p', {}, `${g.participantes.length} pessoas na lista. Depois do sorteio a lista fica travada.`),
         h('button', { className: 'botao grande', onclick: (e) => sortearAgora(e.currentTarget) }, 'Sortear os nomes'));
 
-    const convidar = carta(h('h2', {}, 'Link para a turma'),
-      h('p', {}, 'Um link só, para mandar no grupo. Cada pessoa toca no próprio nome e cria um PIN.'),
+    const convidar = carta(h('h2', {}, 'Chame a turma'),
+      h('p', {}, 'Por QR code, PIN ou link. Cada pessoa toca no próprio nome e cria uma senha.'),
+      h('div', { className: 'convite-qr' }, qr(link), h('p', {}, 'PIN do sorteio', h('strong', {}, pinBonito(g.codigo)))),
       h('div', { className: 'link' }, link),
-      local && !link.startsWith('https:') && h('p', { className: 'dica' }, 'Este link funciona para quem está no mesmo Wi-Fi que este computador.'),
+      NA_MAQUINA && !link.startsWith('https:') && h('p', { className: 'dica' }, 'Este link funciona para quem está no mesmo Wi-Fi que este computador.'),
       h('div', { className: 'acoes' },
+        h('a', { className: 'botao', href: `/telao/${id}` }, 'Abrir o telão'),
         h('a', { className: 'botao verde', href: `https://wa.me/?text=${encodeURIComponent(convite)}`, target: '_blank', rel: 'noopener noreferrer' }, 'Mandar no WhatsApp'),
         h('button', { className: 'botao claro', onclick: () => copiar(link) }, 'Copiar link'),
         h('a', { className: 'botao claro', href: `/g/${id}` }, 'Ver a árvore')));
@@ -250,9 +364,9 @@ async function telaOrganizar(id) {
       h('ul', { className: 'lista' }, g.participantes.map((p) => {
         const sit = [p.abriu ? 'já abriu o presente' : p.temPin ? 'já entrou' : 'ainda não entrou', g.comDesejos.includes(p.id) && 'deixou lista de desejos'].filter(Boolean).join(', ');
         return h('li', {}, h('i', { className: `luz ${p.abriu ? 'on' : ''}` }), h('div', { className: 'quem' }, p.nome, h('small', {}, sit)),
-          p.temPin && h('button', { className: 'texto-botao', 'aria-label': `Apagar PIN de ${p.nome}`, onclick(e) {
-            if (confirm(`Apagar o PIN de ${p.nome}? A pessoa cria outro quando entrar.`)) agir(e.target, 'POST', `/participantes/${p.id}/resetar-pin`, {}, 'PIN apagado');
-          } }, 'Apagar PIN'),
+          p.temPin && h('button', { className: 'texto-botao', 'aria-label': `Apagar senha de ${p.nome}`, onclick(e) {
+            if (confirm(`Apagar a senha de ${p.nome}? A pessoa cria outra quando entrar.`)) agir(e.target, 'POST', `/participantes/${p.id}/resetar-pin`, {}, 'Senha apagada');
+          } }, 'Apagar senha'),
           !g.sorteado && h('button', { className: 'texto-botao', 'aria-label': `Tirar ${p.nome} da lista`, onclick(e) {
             if (confirm(`Tirar ${p.nome} da lista?`)) agir(e.target, 'DELETE', `/participantes/${p.id}`);
           } }, 'Tirar'));
@@ -291,7 +405,7 @@ async function telaOrganizar(id) {
     mostrar(h('div', { className: 'painel' },
       h('header', { className: 'festa' }, h('h1', {}, g.nome), detalhes(g),
         h('p', { className: 'convite' }, 'Guarde o endereço desta página: só por ele dá para organizar. Não mande este link para a turma.')),
-      ...(g.sorteado ? [convidar, sorteio] : [sorteio]), pessoas, ...[restricoes].filter(Boolean), ...(g.sorteado ? [] : [convidar]), editar));
+      convidar, sorteio, pessoas, ...[restricoes].filter(Boolean), editar));
     scrollTo(0, y);
   }
   desenhar();
@@ -301,21 +415,13 @@ async function telaOrganizar(id) {
 
 async function telaArvore(id) {
   const base = `/grupos/${id}`;
-  let g = await api('GET', base), naArvore = true, larguraAntes = 0;
+  let g = await api('GET', base), naArvore = true, larguraAntes = 0, vigia = 0;
 
   function desenhar() {
     document.title = g.nome;
     const abertos = g.participantes.filter((p) => p.abriu).length, total = g.participantes.length;
     const largura = larguraAntes = Math.min(app.clientWidth - 32, 660);
-    const a = montarArvore(total, largura, abertos === total);
-    const arvore = h('div', { className: 'arvore', role: 'group', 'aria-label': 'Participantes' }, a.desenho);
-    arvore.style.width = `${largura}px`; arvore.style.height = `${a.altura}px`;
-    g.participantes.forEach((p, i) => {
-      const b = h('button', { className: `bolinha ${p.abriu ? 'acesa' : ''}`, title: p.nome, onclick: () => pedirPin(p) },
-        bolinha(i), h('span', {}, p.nome), p.abriu && h('em', { className: 'so-leitor' }, ' (já abriu o presente)'));
-      Object.assign(b.style, { left: `${a.pos[i].x}px`, top: `${a.pos[i].y}px`, width: `${a.larguraItem}px` });
-      arvore.append(b);
-    });
+    const { arvore } = arvoreDe(g, largura, pedirPin);
     const y = scrollY;
     mostrar(h('div', { className: 'festa' }, h('h1', {}, g.nome), detalhes(g),
       h('p', { className: 'convite' }, !g.sorteado ? 'O sorteio ainda não foi feito. Toque no seu nome e já deixe sua lista de desejos.'
@@ -333,15 +439,15 @@ async function telaArvore(id) {
   }
 
   async function pedirPin(p) {
-    // Confere o estado mais novo: outra pessoa pode ter criado o PIN há pouco.
+    // Confere o estado mais novo: outra pessoa pode ter criado a senha há pouco.
     try { g = await api('GET', base); } catch (e) { return aviso(e.message, true); }
     p = g.participantes.find((x) => x.id === p.id);
     if (!p || document.querySelector('dialog')) return p || desenhar();
     const criar = !p.temPin;
     const erro = h('p', { className: 'erro', role: 'alert' });
-    const pin = h('input', { inputMode: 'numeric', pattern: '[0-9]{4}', maxLength: 4, required: true, autocomplete: 'off', type: criar ? 'text' : 'password', 'aria-label': 'PIN de 4 números',
+    const pin = h('input', { inputMode: 'numeric', pattern: '[0-9]{4}', maxLength: 4, required: true, autocomplete: 'off', type: criar ? 'text' : 'password', 'aria-label': 'Senha de 4 números',
       oninput() { pin.value = pin.value.replace(/\D/g, ''); } });
-    const ok = h('button', { className: 'botao cheio' }, criar ? `Sou ${p.nome}, criar PIN` : 'Entrar');
+    const ok = h('button', { className: 'botao cheio' }, criar ? `Sou ${p.nome}, criar senha` : 'Entrar');
     const d = h('dialog', { onclose: () => { d.remove(); if (naArvore) desenhar(); }, onclick: (e) => e.target === d && d.close() }, h('form', { async onsubmit(e) {
       e.preventDefault();
       ok.disabled = true; erro.textContent = '';
@@ -352,10 +458,10 @@ async function telaArvore(id) {
         pessoal({ pid: p.id, pin: pin.value }, r);
       } catch (x) { erro.textContent = x.message; pin.value = ''; pin.focus(); } finally { ok.disabled = false; }
     } }, carta(h('h2', {}, `Olá, ${p.nome}!`),
-      h('p', {}, criar ? 'Crie um PIN de 4 números. Só com ele dá para ver quem você tirou.' : 'Digite o seu PIN de 4 números.'),
+      h('p', {}, criar ? 'Crie uma senha de 4 números. Só com ela dá para ver quem você tirou.' : 'Digite a sua senha de 4 números.'),
       h('div', { className: 'pin' }, pin), erro, ok,
       h('button', { type: 'button', className: 'texto-botao', onclick: () => d.close() }, 'Não sou eu, voltar'),
-      !criar && h('p', { className: 'dica' }, 'Esqueceu? Peça para quem organizou apagar o seu PIN.'))));
+      !criar && h('p', { className: 'dica' }, 'Esqueceu? Peça para quem organizou apagar a sua senha.'))));
     document.body.append(d); d.showModal(); pin.focus();
   }
 
@@ -364,7 +470,7 @@ async function telaArvore(id) {
     const listaDela = h('div');
     const titulo = h('h1', {}, r.sorteado ? (r.eu.abriu ? `${r.eu.nome}, é só abrir de novo` : `${r.eu.nome}, este é o seu presente`) : `Olá, ${r.eu.nome}!`);
 
-    const dica = h('p', {}, r.sorteado ? 'Toque na caixa. Veja se ninguém está espiando!' : 'O sorteio ainda não foi feito. Enquanto isso, conte o que você gostaria de ganhar.');
+    const dica = h('p', {}, r.sorteado ? 'Toque na caixa. Veja se ninguém está espiando!' : 'Você está na árvore! Esperando o sorteio… a sua caixa aparece aqui sozinha. Enquanto isso, conte o que gostaria de ganhar.');
     const palco = h('div', { className: 'palco' });
     function fechar() {
       listaDela.replaceChildren();
@@ -384,6 +490,19 @@ async function telaArvore(id) {
       palco.replaceChildren(caixa);
     }
     if (r.sorteado) fechar();
+    // Ainda sem sorteio: fica de olho e mostra a caixa na hora, sem perder o que a pessoa digitou.
+    clearInterval(vigia);
+    if (!r.sorteado) vigia = setInterval(async () => {
+      if (document.hidden) return;
+      const novo = await api('GET', base).catch(() => null);
+      if (!novo?.sorteado || naArvore) return;
+      clearInterval(vigia);
+      const r2 = await api('POST', `${base}/entrar`, cred).catch((e) => aviso(e.message, true));
+      if (!r2 || naArvore) return;
+      r2.eu.desejos = desejos.value;
+      pessoal(cred, r2);
+      aviso('O sorteio foi feito!');
+    }, 3000);
 
     listaDela.className = 'lista-dele';
     const salvar = h('button', { className: 'botao verde' }, 'Salvar minha lista');
@@ -396,7 +515,7 @@ async function telaArvore(id) {
       } }, carta(h('h2', {}, 'Minha lista de desejos'), h('p', { className: 'dica' }, 'Só quem tirou você vai ler.'), campo('O que você gostaria de ganhar', desejos), h('div', {}, salvar))),
       h('button', { className: 'botao claro', async onclick() {
         g = await api('GET', base).catch(() => g);
-        naArvore = true; desenhar();
+        clearInterval(vigia); naArvore = true; desenhar();
       } }, 'Sair e voltar para a árvore')));
     app.focus({ preventScroll: true });
   }
@@ -436,7 +555,9 @@ const [, tela, id] = location.pathname.split('/');
 try {
   if (tela === 'g') await telaArvore(id);
   else if (tela === 'organizar') await telaOrganizar(id);
-  else telaInicio();
+  else if (tela === 'telao') await telaTelao(id);
+  else if (tela === 'novo') telaNovo();
+  else telaEntrar();
 } catch (e) {
   mostrar(carta(h('h2', {}, 'Esse link não abriu'), h('p', {}, e.message), h('div', {}, h('a', { className: 'botao', href: '/' }, 'Ir para o início'))));
 }
