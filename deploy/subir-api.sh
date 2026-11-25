@@ -6,8 +6,8 @@ cd "$(dirname "$0")/.."
 docker build -q -t sorteio-natal . >/dev/null
 docker network inspect natal >/dev/null 2>&1 || docker network create natal >/dev/null
 docker rm -f natal_api >/dev/null 2>&1 || true
-# A porta só abre para esta máquina; quem vem de fora entra pelo túnel.
+# Sem porta aberta nesta máquina: só o túnel (natal_tunel) alcança a API, pela rede "natal".
 docker run -d --name natal_api --init --restart unless-stopped --network natal \
-  -p 127.0.0.1:2512:2512 -v natal_dados:/dados -e ENDERECO="${1:-}" \
+  -v natal_dados:/dados -e ENDERECO="${1:-}" \
   --read-only --cap-drop ALL --security-opt no-new-privileges --memory 256m sorteio-natal >/dev/null
-echo "API no ar em http://localhost:2512"
+echo "API no ar (sem porta local; acesso pelo túnel)"

@@ -21,7 +21,7 @@ Numeração, linhas vazias e repetidos saem sozinhos. O arquivo é lido no naveg
 
 ## Demonstração
 
-`http://localhost:2512/demo` mostra a árvore com os nomes nas bolinhas e sorteia uma a uma, sem salvar nada. A página está em `demo/arvore-amigo-secreto.html`. Para abrir com a sua lista, crie `demo/nomes.js` com `window.NOMES = ['Ana', 'Bruno', 'Carla'];` (fica fora do Git).
+`/demo` mostra a árvore com os nomes nas bolinhas e sorteia uma a uma, sem salvar nada. A página está em `demo/arvore-amigo-secreto.html`. Para abrir com a sua lista, crie `demo/nomes.js` com `window.NOMES = ['Ana', 'Bruno', 'Carla'];` (fica fora do Git).
 
 ## Bom saber
 
@@ -34,7 +34,7 @@ Numeração, linhas vazias e repetidos saem sozinhos. O arquivo é lido no naveg
 
 Celular -> Vercel (site) -> túnel https -> Docker neste Linux (API). O computador precisa ficar ligado.
 
-1. `deploy/subir-api.sh` sobe a API em um contêiner (`natal_api`), só em localhost:2512.
+1. `deploy/subir-api.sh` sobe a API em um contêiner (`natal_api`), sem porta aberta na máquina.
 2. `deploy/tunel.sh` abre um túnel https gratuito até a API e grava o endereço no `vercel.json`.
 3. Envie o `vercel.json` para o `main`: o Vercel publica sozinho.
 4. `deploy/subir-api.sh https://endereco-do-site` atualiza o endereço dos links.
