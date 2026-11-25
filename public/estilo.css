@@ -214,3 +214,5 @@ dialog .carta { box-shadow: none; }
   *, *::before, *::after { animation-duration: .01s !important; animation-delay: 0s !important; animation-iteration-count: 1 !important; transition-duration: .01s !important; transition-delay: 0s !important; }
 }
 dialog:has(.globo)::backdrop { background: rgb(8 14 36 / .93); }
+.importar { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+.campo textarea.soltar { border: 2px dashed var(--pinho); background: #eef7f1; }

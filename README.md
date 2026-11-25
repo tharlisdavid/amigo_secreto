@@ -10,6 +10,15 @@ Precisa só do Node 20 ou mais novo. Não tem nada para instalar.
 3. Se quiser, diga quem não pode tirar quem, e clique em "Sortear os nomes".
 4. Mande o link da turma no WhatsApp. Cada um toca no próprio nome, cria um PIN e abre o presente.
 
+## Importar participantes
+
+A lista pode vir de um arquivo `.txt`, `.csv` ou `.xlsx` (só esses), de até 2 MB:
+
+- **TXT:** um nome por linha, ou separados por vírgula ou ponto e vírgula.
+- **CSV e XLSX:** usa a coluna com título "Nome" ou "Participante" (e junta "Sobrenome", se houver). Sem título, usa a coluna que parece ter nomes. No XLSX vale a primeira aba visível com nomes.
+
+Numeração, linhas vazias e repetidos saem sozinhos. O arquivo é lido no navegador e não é enviado.
+
 ## Demonstração
 
 `http://localhost:2512/demo` mostra a árvore com os nomes nas bolinhas e sorteia uma a uma, sem salvar nada. A página está em `demo/arvore-amigo-secreto.html`. Para abrir com a sua lista, crie `demo/nomes.js` com `window.NOMES = ['Ana', 'Bruno', 'Carla'];` (fica fora do Git).

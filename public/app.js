@@ -61,6 +61,24 @@ const carta = (...f) => h('section', { className: 'carta' }, h('div', { classNam
 const campo = (rotulo, entrada, dica) => h('label', { className: 'campo' }, h('span', {}, rotulo, dica && h('small', {}, ` ${dica}`)), entrada);
 const nomesDe = (t) => t.split(/[\n,;]+/).map((s) => s.trim().replace(/\s+/g, ' ')).filter(Boolean);
 
+/** Botão que abre um .txt, .csv ou .xlsx e entrega os nomes lidos. Também aceita soltar o arquivo em `alvo`. */
+function importador(rotulo, receber, alvo) {
+  const ler = (arq) => arq && tentar(botao, async () => receber(await importarNomes(arq)));
+  const entrada = h('input', { type: 'file', accept: '.txt,.csv,.xlsx', hidden: true, onchange() { ler(entrada.files[0]); entrada.value = ''; } });
+  const botao = h('button', { type: 'button', className: 'botao claro', onclick: () => entrada.click() }, rotulo);
+  if (alvo) {
+    alvo.addEventListener('dragover', (e) => { if (e.dataTransfer.types.includes('Files')) { e.preventDefault(); alvo.classList.add('soltar'); } });
+    alvo.addEventListener('dragleave', () => alvo.classList.remove('soltar'));
+    alvo.addEventListener('drop', (e) => { alvo.classList.remove('soltar'); if (e.dataTransfer.files.length) { e.preventDefault(); ler(e.dataTransfer.files[0]); } });
+  }
+  return h('div', { className: 'importar' }, botao, entrada, h('span', { className: 'dica' }, 'Aceita TXT, CSV e XLSX'));
+}
+const semRepetir = (atuais, novos) => {
+  const vistos = new Set(atuais.map((n) => n.toLocaleLowerCase('pt-BR')));
+  return novos.filter((n) => !vistos.has(n.toLocaleLowerCase('pt-BR')));
+};
+const quantos = (n, um, varios) => `${n} ${n === 1 ? um : varios}`;
+
 function mostrar(...els) {
   app.replaceChildren(...els);
   scrollTo(0, 0);
@@ -107,6 +125,12 @@ function telaInicio() {
     conta.textContent = n.length < 3 ? 'Coloque pelo menos 3 pessoas.' : `${n.length} pessoas na lista.`;
   }
   atualizar();
+  const importar = importador('Importar lista', ({ nomes, repetidos }) => {
+    const atuais = nomesDe(lista.value), novos = semRepetir(atuais, nomes), fora = repetidos + nomes.length - novos.length;
+    lista.value = [...atuais, ...novos].join('\n');
+    atualizar();
+    aviso(quantos(novos.length, 'nome importado', 'nomes importados') + (fora ? `, ${quantos(fora, 'repetido ficou', 'repetidos ficaram')} de fora` : ''));
+  }, lista);
   const botao = h('button', { className: 'botao grande cheio' }, 'Criar amigo secreto');
   const form = h('form', { onsubmit(e) {
     e.preventDefault();
@@ -116,7 +140,7 @@ function telaInicio() {
       guardados.por({ ...r, nome: dados.nome });
       location.href = `/organizar/${r.id}#${r.chave}`;
     });
-  } }, carta(h('h2', {}, 'Querido Papai Noel,'), ...festa.els, campo('Quem vai participar', lista, '(um nome por linha)'), conta, etiquetas, botao));
+  } }, carta(h('h2', {}, 'Querido Papai Noel,'), ...festa.els, campo('Quem vai participar', lista, '(um nome por linha)'), importar, conta, etiquetas, botao));
 
   const meus = guardados.ler();
   mostrar(h('div', { className: 'inicio' },
@@ -202,7 +226,15 @@ async function telaOrganizar(id) {
       !g.sorteado && h('form', { className: 'linha-campos', onsubmit(e) {
         e.preventDefault();
         agir(e.submitter, 'POST', '/participantes', { nomes: nomesDe(novos.value) });
-      } }, novos, h('button', { className: 'botao verde' }, 'Adicionar')));
+      } }, novos, h('button', { className: 'botao verde' }, 'Adicionar')),
+      !g.sorteado && importador('Importar lista', async ({ nomes }) => {
+        const faltam = semRepetir(g.participantes.map((p) => p.nome), nomes);
+        if (!faltam.length) return aviso('Todos os nomes do arquivo já estão na lista.');
+        if (!confirm(`Adicionar ${quantos(faltam.length, 'pessoa', 'pessoas')}?\n\n${faltam.slice(0, 20).join('\n')}${faltam.length > 20 ? '\n…' : ''}`)) return;
+        g = await api('POST', `${base}/participantes`, { nomes: faltam }, chave);
+        desenhar();
+        aviso(quantos(faltam.length, 'pessoa adicionada', 'pessoas adicionadas'));
+      }));
 
     const opcoes = () => g.participantes.map((p) => h('option', { value: p.id }, p.nome));
     const a = h('select', { 'aria-label': 'Primeira pessoa' }, opcoes()), b = h('select', { 'aria-label': 'Segunda pessoa' }, opcoes());
