@@ -3,3 +3,4 @@ node_modules/
 .vercel/
 demo/nomes.js
 dist/
+chave/

@@ -1,9 +1,9 @@
 import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
-import { promises as fs, mkdirSync, readdirSync, readFileSync } from 'node:fs';
-import { createHash, randomBytes, randomInt, scrypt, timingSafeEqual } from 'node:crypto';
-import { promisify } from 'node:util';
+import { promises as fs, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { createCipheriv, createDecipheriv, createHash, randomBytes, randomInt, scrypt, timingSafeEqual } from 'node:crypto';
+import { isDeepStrictEqual, promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { sortear } from './sorteio.js';
 import { CSP_DEMO, montarDemo } from './demo/pagina.mjs';
@@ -11,19 +11,96 @@ import { CSP_DEMO, montarDemo } from './demo/pagina.mjs';
 const RAIZ = path.dirname(fileURLToPath(import.meta.url));
 const PUBLICO = path.join(RAIZ, 'public');
 const DADOS = process.env.DADOS || path.join(RAIZ, 'data');
+const CHAVE = process.env.CHAVE || path.join(RAIZ, 'chave', 'mestra.key');
 const PORTA = Number(process.env.PORT ?? 2512);
 const MAX_PESSOAS = 60;
 const MIN_PESSOAS = 3;
-const MAX_GRUPOS = 300; // aberto na internet, evita que alguém encha o disco
+const MAX_GRUPOS = 2000; // aberto na internet, evita que alguém encha o disco
 const scryptAsync = promisify(scrypt);
 
-/* ---------- Armazenamento: um arquivo JSON por sorteio ---------- */
+/* ---------- Armazenamento: uma pasta por sorteio ----------
+   dados/natal-da-familia--Ab12Cd34/
+     sorteio.json             tudo do sorteio; quem tirou quem e os desejos ficam cifrados
+     participantes/nomes.txt  a lista de nomes, para consulta
+   O id no fim da pasta impede que sorteios com o mesmo nome se misturem. */
 
 mkdirSync(DADOS, { recursive: true });
+const pastasSalvas = readdirSync(DADOS, { withFileTypes: true }).filter((d) => d.isDirectory() && existsSync(path.join(DADOS, d.name, 'sorteio.json')));
+
+function lerChave() {
+  if (!existsSync(CHAVE)) {
+    if (pastasSalvas.length) {
+      // Criar outra chave aqui deixaria todos os resultados ilegíveis para sempre.
+      console.error(`Falta a chave ${CHAVE}. Sem ela os sorteios guardados não abrem; recupere-a da cópia de segurança.`);
+      process.exit(1);
+    }
+    mkdirSync(path.dirname(CHAVE), { recursive: true });
+    writeFileSync(CHAVE, randomBytes(32).toString('hex'), { mode: 0o600, flag: 'wx' });
+  }
+  const k = Buffer.from(readFileSync(CHAVE, 'utf8').trim(), 'hex');
+  if (k.length !== 32) { console.error(`A chave ${CHAVE} está estragada.`); process.exit(1); }
+  return k;
+}
+const chaveMestra = lerChave();
+
+function cifrar(dados, dono) {
+  const iv = randomBytes(12), c = createCipheriv('aes-256-gcm', chaveMestra, iv).setAAD(Buffer.from(dono));
+  return Buffer.concat([iv, c.update(JSON.stringify(dados), 'utf8'), c.final(), c.getAuthTag()]).toString('base64');
+}
+function decifrar(txt, dono) {
+  const b = Buffer.from(txt, 'base64'), d = createDecipheriv('aes-256-gcm', chaveMestra, b.subarray(0, 12)).setAAD(Buffer.from(dono));
+  d.setAuthTag(b.subarray(-16));
+  return JSON.parse(Buffer.concat([d.update(b.subarray(12, -16)), d.final()]).toString('utf8'));
+}
+
+// O resultado é cifrado junto com o dono: trocar o segredo de uma pessoa pelo de outra não funciona.
+const paraArquivo = (g) => ({ ...g, participantes: g.participantes.map(({ tirou, desejos, ...p }) => ({ ...p, segredo: cifrar({ tirou, desejos }, `${g.id}|${p.id}`) })) });
+const doArquivo = (g) => ({ ...g, participantes: g.participantes.map(({ segredo, ...p }) => ({ ...p, ...decifrar(segredo, `${g.id}|${p.id}`) })) });
+
+const apelido = (s) => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40).replace(/^-+|-+$/g, '') || 'sorteio';
+const nomePasta = (g) => `${apelido(g.nome)}--${g.id}`;
+
 const grupos = new Map();
+const pastaDe = new Map();
+for (const { name } of pastasSalvas) {
+  try {
+    const g = doArquivo(JSON.parse(readFileSync(path.join(DADOS, name, 'sorteio.json'), 'utf8')));
+    grupos.set(g.id, g);
+    pastaDe.set(g.id, name);
+  } catch (e) {
+    console.error(`Não consegui abrir ${name}: ${e.message}. Os outros sorteios seguem normais.`);
+  }
+}
+
+async function gravarArquivo(destino, conteudo) {
+  await fs.writeFile(`${destino}.tmp`, conteudo, { mode: 0o600 });
+  await fs.rename(`${destino}.tmp`, destino);
+}
+const filas = new Map();
+function salvar(g) {
+  const gravar = async () => {
+    const pasta = nomePasta(g), antes = pastaDe.get(g.id);
+    if (antes && antes !== pasta) await fs.rename(path.join(DADOS, antes), path.join(DADOS, pasta)); // a festa mudou de nome
+    pastaDe.set(g.id, pasta);
+    await fs.mkdir(path.join(DADOS, pasta, 'participantes'), { recursive: true, mode: 0o700 });
+    await gravarArquivo(path.join(DADOS, pasta, 'sorteio.json'), JSON.stringify(paraArquivo(g), null, 2));
+    await gravarArquivo(path.join(DADOS, pasta, 'participantes', 'nomes.txt'), g.participantes.map((p) => p.nome).join('\n') + '\n');
+  };
+  const p = (filas.get(g.id) ?? Promise.resolve()).catch(() => {}).then(gravar);
+  filas.set(g.id, p);
+  return p;
+}
+
+// Formato antigo (um .json solto por sorteio): passa para pasta, confere e só então apaga o solto.
 for (const arq of readdirSync(DADOS).filter((f) => f.endsWith('.json'))) {
-  const g = JSON.parse(readFileSync(path.join(DADOS, arq), 'utf8'));
-  grupos.set(g.id, g);
+  const solto = path.join(DADOS, arq), g = JSON.parse(readFileSync(solto, 'utf8'));
+  if (!grupos.has(g.id)) {
+    grupos.set(g.id, g);
+    await salvar(g);
+    const relido = doArquivo(JSON.parse(readFileSync(path.join(DADOS, nomePasta(g), 'sorteio.json'), 'utf8')));
+    if (!isDeepStrictEqual(relido, g)) throw new Error(`A mudança de ${arq} não conferiu; o arquivo original foi mantido.`);
+  }
+  await fs.unlink(solto);
 }
 
 // PIN do sorteio: 6 números, é o que a turma digita para entrar.
@@ -33,18 +110,6 @@ function darCodigo(g) {
   porCodigo.set(g.codigo, g.id);
 }
 for (const g of grupos.values()) if (g.codigo) porCodigo.set(g.codigo, g.id);
-
-const filas = new Map();
-function salvar(g) {
-  const gravar = async () => {
-    const destino = path.join(DADOS, `${g.id}.json`);
-    await fs.writeFile(`${destino}.tmp`, JSON.stringify(g, null, 2), { mode: 0o600 });
-    await fs.rename(`${destino}.tmp`, destino);
-  };
-  const p = (filas.get(g.id) ?? Promise.resolve()).catch(() => {}).then(gravar);
-  filas.set(g.id, p);
-  return p;
-}
 
 for (const g of grupos.values()) if (!g.codigo) { darCodigo(g); salvar(g); }
 
@@ -191,7 +256,10 @@ const rotaAdmin = (metodo, padrao, fn) =>
     return visaoAdmin(ctx.g);
   });
 
+let criados = { n: 0, ate: 0 };
 rota('POST', '/grupos', async ({ corpo }) => {
+  if (criados.ate < Date.now()) criados = { n: 0, ate: Date.now() + 600_000 };
+  if (++criados.n > 30) throw new Erro(429, 'Muitos sorteios criados agora. Tente de novo em 10 minutos.');
   if (grupos.size >= MAX_GRUPOS) throw new Erro(503, 'Já temos sorteios demais por aqui.');
   const festa = dadosFesta(corpo);
   const participantes = [];

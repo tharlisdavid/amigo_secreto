@@ -25,10 +25,12 @@ Numeração, linhas vazias e repetidos saem sozinhos. O arquivo é lido no naveg
 
 ## Bom saber
 
-- Cada sorteio é um arquivo em `data/`. Faça cópia dessa pasta; e não abra se não quiser estragar a surpresa.
+- Cada sorteio tem a sua pasta em `dados`, com o nome da festa e um código que impede um de sobrescrever o outro: `natal-da-familia--Ab12Cd34/sorteio.json` e `participantes/nomes.txt`.
+- Quem tirou quem e as listas de desejos ficam cifrados (AES-256-GCM). A chave fica separada (`CHAVE`). Isso evita ver sem querer; quem administra o servidor e tem a chave ainda conseguiria abrir.
+- **Sem a chave os resultados não abrem.** Guarde cópia dos dois, em lugares separados.
 - O organizador não vê o resultado na tela, mas pode apagar senhas (para quem esqueceu).
 - Quem tocar primeiro em um nome cria a senha dele. Se alguém entrar no nome errado, apague a senha; se já tiver aberto o presente, desfaça o sorteio e sorteie de novo.
-- Rodando com `npm start`, o link vale para quem está no mesmo Wi-Fi. Variáveis: `PORT`, `DADOS` (pasta dos arquivos) e `ENDERECO` (site usado nos links).
+- Rodando com `npm start`, o link vale para quem está no mesmo Wi-Fi. Variáveis: `PORT`, `DADOS` (pasta dos arquivos), `CHAVE` (arquivo da chave) e `ENDERECO` (site usado nos links).
 
 ## Colocar na internet
 
@@ -43,6 +45,6 @@ O endereço do túnel muda se o computador ou o contêiner `natal_tunel` reinici
 
 Para a demonstração (`/demo`) abrir com a sua lista, crie no Vercel a variável `NOMES` (separados por vírgula). O site é público: quem tiver o link vê os nomes.
 
-Cópia de segurança: `docker cp natal_api:/dados ./copia-natal`
+Cópia de segurança: `docker cp natal_api:/dados ./copia-natal` e `docker cp natal_api:/chave ./copia-chave` (guarde em lugares separados).
 
 Desenvolvido por Tharlis David
