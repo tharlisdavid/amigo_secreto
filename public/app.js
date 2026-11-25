@@ -194,27 +194,45 @@ function camposFesta(v = {}) {
   };
 }
 
+/** Campo de números em quadradinhos. `oculto` mostra pontos no lugar dos números. */
+function quadradinhos(n, rotulo, { oculto, id, aoCompletar, aoMudar } = {}) {
+  const casas = Array.from({ length: n }, () => h('i', { 'aria-hidden': 'true' }));
+  const entrada = h('input', { id, type: 'text', inputMode: 'numeric', required: true, autocomplete: 'off', enterKeyHint: 'go', 'aria-label': rotulo,
+    oninput() {
+      entrada.value = entrada.value.replace(/\D/g, '').slice(0, n);
+      pintar();
+      aoMudar?.();
+      if (entrada.value.length === n) aoCompletar?.();
+    },
+    onfocus: noFim, onclick: noFim });
+  // O cursor fica sempre no fim, como nos quadradinhos.
+  function noFim() { entrada.setSelectionRange(n, n); }
+  function pintar() {
+    const v = entrada.value;
+    casas.forEach((c, i) => {
+      c.textContent = v[i] ? (oculto ? '•' : v[i]) : '';
+      c.className = `${v[i] ? 'cheio' : ''} ${i === v.length ? 'vez' : ''}`;
+    });
+  }
+  pintar();
+  return { el: h('div', { className: `pin ${n === 6 ? 'seis' : ''}` }, casas, entrada), entrada, limpar() { entrada.value = ''; pintar(); entrada.focus(); } };
+}
+
 /* ---------- Início: entrar com o PIN ---------- */
 
 function telaEntrar() {
   document.title = 'Amigo Secreto de Natal';
   const erro = h('p', { className: 'erro', role: 'alert' });
-  const codigo = h('input', { id: 'codigo', inputMode: 'numeric', maxLength: 7, required: true, autocomplete: 'off', placeholder: '000 000', 'aria-label': 'PIN do sorteio, 6 números',
-    oninput() {
-      const n = codigo.value.replace(/\D/g, '').slice(0, 6);
-      codigo.value = n.length > 3 ? pinBonito(n) : n;
-      erro.textContent = '';
-      if (n.length === 6) form.requestSubmit();
-    } });
+  const codigo = quadradinhos(6, 'PIN do sorteio, 6 números', { id: 'codigo', aoMudar() { erro.textContent = ''; }, aoCompletar: () => form.requestSubmit() });
   const botao = h('button', { className: 'botao grande cheio' }, 'Entrar');
   const form = h('form', { async onsubmit(e) {
     e.preventDefault();
-    const n = codigo.value.replace(/\D/g, '');
+    const n = codigo.entrada.value;
     if (n.length !== 6 || botao.disabled) { if (n.length !== 6) erro.textContent = 'O PIN tem 6 números.'; return; }
     botao.disabled = true;
-    try { location.href = `/g/${(await api('GET', `/codigo/${n}`)).id}`; } catch (x) { erro.textContent = x.message; codigo.select(); } finally { botao.disabled = false; }
-  } }, carta(h('h2', {}, 'PIN do sorteio'), h('div', { className: 'pin codigo' }, codigo), erro, botao,
-    h('p', { className: 'dica' }, 'Tem um QR code na tela ou no grupo? Aponte a câmera do celular e entre direto.')));
+    try { location.href = `/g/${(await api('GET', `/codigo/${n}`)).id}`; } catch (x) { erro.textContent = x.message; codigo.limpar(); } finally { botao.disabled = false; }
+  } }, carta(h('h2', {}, 'Digite o PIN do sorteio'), codigo.el, erro, botao,
+    h('p', { className: 'dica' }, 'Ou aponte a câmera do celular para o QR code.')));
   const meus = guardados.ler();
   mostrar(h('div', { className: 'entrada' },
     h('header', { className: 'chamada' }, h('h1', {}, 'Amigo Secreto')), form,
@@ -445,8 +463,7 @@ async function telaArvore(id) {
     if (!p || document.querySelector('dialog')) return p || desenhar();
     const criar = !p.temPin;
     const erro = h('p', { className: 'erro', role: 'alert' });
-    const pin = h('input', { inputMode: 'numeric', pattern: '[0-9]{4}', maxLength: 4, required: true, autocomplete: 'off', type: criar ? 'text' : 'password', 'aria-label': 'Senha de 4 números',
-      oninput() { pin.value = pin.value.replace(/\D/g, ''); } });
+    const campoSenha = quadradinhos(4, 'Senha de 4 números', { oculto: !criar, aoMudar() { erro.textContent = ''; } }), pin = campoSenha.entrada;
     const ok = h('button', { className: 'botao cheio' }, criar ? `Sou ${p.nome}, criar senha` : 'Entrar');
     const d = h('dialog', { onclose: () => { d.remove(); if (naArvore) desenhar(); }, onclick: (e) => e.target === d && d.close() }, h('form', { async onsubmit(e) {
       e.preventDefault();
@@ -456,10 +473,10 @@ async function telaArvore(id) {
         naArvore = false;
         d.close();
         pessoal({ pid: p.id, pin: pin.value }, r);
-      } catch (x) { erro.textContent = x.message; pin.value = ''; pin.focus(); } finally { ok.disabled = false; }
+      } catch (x) { erro.textContent = x.message; campoSenha.limpar(); } finally { ok.disabled = false; }
     } }, carta(h('h2', {}, `Olá, ${p.nome}!`),
       h('p', {}, criar ? 'Crie uma senha de 4 números. Só com ela dá para ver quem você tirou.' : 'Digite a sua senha de 4 números.'),
-      h('div', { className: 'pin' }, pin), erro, ok,
+      campoSenha.el, erro, ok,
       h('button', { type: 'button', className: 'texto-botao', onclick: () => d.close() }, 'Não sou eu, voltar'),
       !criar && h('p', { className: 'dica' }, 'Esqueceu? Peça para quem organizou apagar a sua senha.'))));
     document.body.append(d); d.showModal(); pin.focus();
