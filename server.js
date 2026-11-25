@@ -6,6 +6,7 @@ import { createHash, randomBytes, scrypt, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { sortear } from './sorteio.js';
+import { CSP_DEMO, montarDemo } from './demo/pagina.mjs';
 
 const RAIZ = path.dirname(fileURLToPath(import.meta.url));
 const PUBLICO = path.join(RAIZ, 'public');
@@ -299,18 +300,20 @@ const TIPOS = {
   '.js': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml', '.woff2': 'font/woff2',
 };
 
-// A demonstração é um arquivo único, com estilo e script dentro dela.
 async function demonstracao(res) {
   const miolo = await fs.readFile(path.join(RAIZ, 'demo', 'arvore-amigo-secreto.html'), 'utf8');
-  res.writeHead(200, {
-    'content-type': TIPOS['.html'], 'cache-control': 'no-cache',
-    'content-security-policy': "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; frame-ancestors 'none'; base-uri 'none'",
-  });
-  res.end(`<!doctype html><html lang="pt-BR"><head><meta name="viewport" content="width=device-width, initial-scale=1"><style>[hidden]{display:none!important}</style>${miolo}</html>`);
+  res.writeHead(200, { 'content-type': TIPOS['.html'], 'cache-control': 'no-cache', 'content-security-policy': CSP_DEMO });
+  res.end(montarDemo(miolo));
 }
 
 async function estatico(caminho, res) {
   if (/^\/demo\/?$/.test(caminho)) return demonstracao(res);
+  if (caminho === '/nomes.js') {
+    // Lista opcional de nomes da demonstração (não vai para o Git).
+    const lista = await fs.readFile(path.join(RAIZ, 'demo', 'nomes.js'), 'utf8').catch(() => '');
+    res.writeHead(200, { 'content-type': TIPOS['.js'], 'cache-control': 'no-cache' });
+    return res.end(lista);
+  }
   const pagina = caminho === '/' || /^\/(g|organizar)\/[\w-]+\/?$/.test(caminho);
   const arq = path.join(PUBLICO, pagina ? 'index.html' : path.normalize(decodeURIComponent(caminho)));
   const tipo = TIPOS[path.extname(arq)];

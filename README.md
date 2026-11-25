@@ -12,7 +12,7 @@ Precisa só do Node 20 ou mais novo. Não tem nada para instalar.
 
 ## Demonstração
 
-`http://localhost:2512/demo` mostra a árvore com os nomes nas bolinhas e sorteia uma a uma, sem salvar nada. A página está em `demo/arvore-amigo-secreto.html`.
+`http://localhost:2512/demo` mostra a árvore com os nomes nas bolinhas e sorteia uma a uma, sem salvar nada. A página está em `demo/arvore-amigo-secreto.html`. Para abrir com a sua lista, crie `demo/nomes.js` com `window.NOMES = ['Ana', 'Bruno', 'Carla'];` (fica fora do Git).
 
 ## Bom saber
 
@@ -27,8 +27,9 @@ Celular -> Vercel (site) -> túnel https -> Docker neste Linux (API). O computad
 
 1. `deploy/subir-api.sh` sobe a API em um contêiner (`natal_api`), só em localhost:2512.
 2. Um túnel https aponta para `http://localhost:2512`.
-3. `deploy/publicar-site.sh https://endereco-do-tunel` publica o site no Vercel.
-4. `deploy/subir-api.sh https://endereco-do-site` atualiza o endereço dos links.
+3. O Vercel publica a cada envio para o `main`, usando o `vercel.json`. Por enquanto a página inicial leva para `/demo`.
+   Para a demonstração abrir com a sua lista, crie no Vercel a variável `NOMES` (nomes separados por vírgula). O site é público: quem tiver o link vê os nomes.
+4. Com o túnel pronto, inclua no `vercel.json` o rewrite de `/api` e tire o redirect da página inicial.
 
 Cópia de segurança: `docker cp natal_api:/dados ./copia-natal`
 

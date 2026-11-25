@@ -1,8 +1,8 @@
 server.js
-sorteio*.js
+sorteio.js
+sorteio.test.js
 package.json
 Dockerfile
-deploy
-demo
+deploy/subir-api.sh
 data
 README.md
