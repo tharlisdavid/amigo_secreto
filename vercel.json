@@ -42,7 +42,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://bathrooms-course-success-distance.trycloudflare.com/api/:path*"
+      "destination": "https://guides-counsel-mins-jewish.trycloudflare.com/api/:path*"
     },
     {
       "source": "/novo",
