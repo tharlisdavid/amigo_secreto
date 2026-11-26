@@ -42,7 +42,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://sectors-rational-pee-urls.trycloudflare.com/api/:path*"
+      "destination": "https://builders-expensive-remaining-collectible.trycloudflare.com/api/:path*"
     },
     {
       "source": "/novo",
