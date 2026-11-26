@@ -27,7 +27,7 @@ async function api(metodo, url, corpo, chave) {
     });
   } catch { throw new Error('Sem conexão com o servidor. Tente de novo.'); }
   const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(j.erro || 'Algo deu errado. Tente de novo.');
+  if (!r.ok) throw Object.assign(new Error(j.erro || 'Algo deu errado. Tente de novo.'), { status: r.status });
   return j;
 }
 
@@ -54,8 +54,27 @@ async function copiar(txt) {
 
 const guardados = {
   ler() { try { return JSON.parse(localStorage.getItem('sorteios')) || []; } catch { return []; } },
-  por(s) { try { localStorage.setItem('sorteios', JSON.stringify([s, ...this.ler().filter((x) => x.id !== s.id)].slice(0, 12))); } catch { /* navegação privada */ } },
+  gravar(l) { try { localStorage.setItem('sorteios', JSON.stringify(l)); } catch { /* navegação privada */ } },
+  por(s) { this.gravar([s, ...this.ler().filter((x) => x.id !== s.id)].slice(0, 12)); },
+  tirar(id) { this.gravar(this.ler().filter((x) => x.id !== id)); },
 };
+
+// Lista "Sorteios que você organiza": some sozinho o que foi apagado no servidor
+// (só quando o servidor responde 404; sem internet, nada é tirado) e cada um tem um ×.
+function listaMeus() {
+  const meus = guardados.ler();
+  if (!meus.length) return null;
+  const nav = h('nav', { className: 'meus' }, h('p', {}, 'Sorteios que você organiza'));
+  const tirar = (s, li) => { guardados.tirar(s.id); li.remove(); if (!nav.querySelector('li')) nav.remove(); };
+  const ul = h('ul', {}, meus.map((s) => {
+    const li = h('li', {}, h('a', { href: `/organizar/${s.id}#${s.chave}` }, s.nome),
+      h('button', { className: 'tirar', 'aria-label': `Tirar ${s.nome} da lista`, title: 'Tirar da lista', onclick: () => tirar(s, li) }, '×'));
+    api('GET', `/grupos/${s.id}`).catch((x) => { if (x.status === 404) tirar(s, li); });
+    return li;
+  }));
+  nav.append(ul);
+  return nav;
+}
 
 const carta = (...f) => h('section', { className: 'carta' }, h('div', { className: 'carta-miolo' }, ...f));
 const campo = (rotulo, entrada, dica) => h('label', { className: 'campo' }, h('span', {}, rotulo, dica && h('small', {}, ` ${dica}`)), entrada);
@@ -236,11 +255,10 @@ function telaEntrar() {
     try { location.href = `/g/${(await api('GET', `/codigo/${n}`)).id}`; } catch (x) { erro.textContent = x.message; codigo.limpar(); } finally { botao.disabled = false; }
   } }, carta(h('h2', {}, 'Digite o PIN do sorteio'), codigo.el, erro, botao,
     h('p', { className: 'dica' }, 'Ou aponte a câmera do celular para o QR code.')));
-  const meus = guardados.ler();
   mostrar(h('div', { className: 'entrada' },
     h('header', { className: 'chamada' }, h('h1', {}, 'Amigo Secreto')), form,
     h('div', { className: 'acoes' }, h('a', { className: 'botao verde', href: '/novo' }, 'Criar um sorteio'), h('button', { className: 'botao claro', onclick: () => comoUsar('participante') }, 'Como usar')),
-    meus.length > 0 && h('nav', { className: 'meus' }, h('p', {}, 'Sorteios que você organiza'), meus.map((s) => h('a', { href: `/organizar/${s.id}#${s.chave}` }, s.nome)))));
+    listaMeus()));
 }
 
 /* ---------- Telão: QR code, PIN e a turma chegando ao vivo ---------- */
@@ -320,14 +338,12 @@ function telaNovo() {
     });
   } }, carta(h('h2', {}, 'Querido Papai Noel,'), ...festa.els, campo('Quem vai participar', lista, '(um nome por linha)'), importar, conta, etiquetas, botao));
 
-  const meus = guardados.ler();
   mostrar(h('div', { className: 'inicio' },
     h('header', { className: 'chamada' }, h('h1', {}, 'Amigo Secreto'),
       h('p', {}, 'Escreva os nomes e chame a turma com QR code ou PIN. Cada um abre o seu presente no próprio celular ou computador.'),
       h('div', { className: 'ver-uso acoes centro' }, h('button', { className: 'botao claro', onclick: () => comoUsar('organizador') }, 'Como usar'), h('a', { className: 'botao claro', href: '/' }, 'Tenho um PIN')),
       enfeiteGrande(),
-      meus.length > 0 && h('nav', { className: 'meus' }, h('p', {}, 'Sorteios que você organiza'),
-        meus.map((s) => h('a', { href: `/organizar/${s.id}#${s.chave}` }, s.nome)))),
+      listaMeus()),
     form));
   primeiraVisita('organizador');
 }
@@ -579,5 +595,6 @@ try {
   else if (tela === 'novo') telaNovo();
   else telaEntrar();
 } catch (e) {
+  if (e.status === 404 && id) guardados.tirar(id); // sorteio apagado: sai da lista
   mostrar(carta(h('h2', {}, 'Esse link não abriu'), h('p', {}, e.message), h('div', {}, h('a', { className: 'botao', href: '/' }, 'Ir para o início'))));
 }
