@@ -30,6 +30,7 @@ refazer() {
   local api
   echo "Site fora; abrindo túnel novo"
   docker start natal_api >/dev/null 2>&1 || true
+  git checkout -q -- vercel.json 2>/dev/null || true # o tunel.sh grava de novo
   git pull -q --rebase origin main || true
   api=$(TUNEL_HOST=1 deploy/tunel.sh) || { echo "tunel.sh falhou"; return 1; }
   for _ in $(seq 1 30); do tunel_ok "$api" && break; sleep 3; done
