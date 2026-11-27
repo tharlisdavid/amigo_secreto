@@ -42,7 +42,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://jacksonville-treatment-minnesota-withdrawal.trycloudflare.com/api/:path*"
+      "destination": "https://motivated-tapes-validation-gym.trycloudflare.com/api/:path*"
     },
     {
       "source": "/novo",

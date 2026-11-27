@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
 # Abre um túnel https gratuito (sem conta) até a API e grava o endereço no vercel.json.
 # O endereço muda quando o túnel reinicia: rode de novo e envie o vercel.json para o GitHub.
+# Argumentos extras vão para o cloudflared, por exemplo --edge 198.41.200.13:7844
+# quando a rede bloqueia parte dos servidores da Cloudflare.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 docker rm -f natal_tunel >/dev/null 2>&1 || true
 # Fica na rede "natal", então só enxerga a API do sorteio.
 docker run -d --name natal_tunel --restart unless-stopped --network natal \
   --read-only --cap-drop ALL --security-opt no-new-privileges --memory 128m \
-  cloudflare/cloudflared:latest tunnel --no-autoupdate --protocol http2 --url http://natal_api:2512 >/dev/null
+  cloudflare/cloudflared:latest tunnel --no-autoupdate --protocol http2 "$@" --url http://natal_api:2512 >/dev/null
 for _ in $(seq 1 30); do
   sleep 1
   API=$(docker logs natal_tunel 2>&1 | grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' | grep -v '//api\.' | head -1 || true)
