@@ -43,6 +43,8 @@ Celular -> Vercel (site) -> túnel https -> Docker neste Linux (API). O computad
 
 O endereço do túnel muda se o computador ou o contêiner `natal_tunel` reiniciar. Nesse caso, repita os passos 2 e 3; os sorteios e os links da turma continuam os mesmos.
 
+Para não precisar fazer isso na mão, `deploy/instalar-vigia.sh` instala um vigia que testa o site a cada minuto e, se o túnel cair, abre outro e envia o `vercel.json` sozinho (log: `journalctl --user -u natal-vigia -f`). Com o Cloudflare WARP ligado os contêineres ficam sem internet: o vigia já abre o túnel com `TUNEL_HOST=1`, pela rede do computador.
+
 Para a demonstração (`/demo`) abrir com a sua lista, crie no Vercel a variável `NOMES` (separados por vírgula). O site é público: quem tiver o link vê os nomes.
 
 Cópia de segurança: `docker cp natal_api:/dados ./copia-natal` e `docker cp natal_api:/chave ./copia-chave` (guarde em lugares separados).
