@@ -11,7 +11,12 @@ REDE=(--network natal) ALVO=http://natal_api:2512
 # Com o Cloudflare WARP ligado, os contêineres ficam sem internet. TUNEL_HOST=1 usa a
 # rede do computador e chega à API pelo IP interno dela (a API segue sem porta aberta).
 if [ "${TUNEL_HOST:-}" = 1 ]; then
-  IP=$(docker inspect -f '{{(index .NetworkSettings.Networks "natal").IPAddress}}' natal_api)
+  # O WARP também desvia o caminho do computador até 172.x. A faixa 192.0.0.0/24 fica
+  # fora dele, então a API ganha uma segunda rede ("natal_ponte") nessa faixa.
+  docker network inspect natal_ponte >/dev/null 2>&1 \
+    || docker network create --subnet 192.0.0.0/24 natal_ponte >/dev/null
+  docker network connect natal_ponte natal_api 2>/dev/null || true
+  IP=$(docker inspect -f '{{(index .NetworkSettings.Networks "natal_ponte").IPAddress}}' natal_api)
   REDE=(--network host) ALVO=http://$IP:2512
 fi
 docker run -d --name natal_tunel --restart unless-stopped "${REDE[@]}" \
