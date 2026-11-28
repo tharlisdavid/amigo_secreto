@@ -42,7 +42,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://show-elected-breach-smooth.trycloudflare.com/api/:path*"
+      "destination": "https://monica-posted-artists-libs.trycloudflare.com/api/:path*"
     },
     {
       "source": "/novo",
